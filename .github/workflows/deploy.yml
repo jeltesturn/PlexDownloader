@@ -13,26 +13,52 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Stop existing server (if running)
+    - name: Stop existing server
       run: |
+        echo "🛑 Stopping existing PlexDownloader processes..."
         pkill -f "app.py" || true
         pkill -f "gunicorn.*app:app" || true
-        sleep 2
+        pkill -f "PlexDownloader" || true
+        sleep 3
         
-    - name: Test server manually first
+    - name: Setup and deploy
       run: |
-        echo "Testing basic functionality..."
-        /usr/bin/python3 -c "import os; print('Python working'); print('Movies path exists:', os.path.exists('/Volumes/plexlib/movies')); print('Series path exists:', os.path.exists('/Volumes/plexlib/series'))"
+        echo "🔧 Setting up PlexDownloader..."
+        chmod +x start_server.sh diagnose.sh
         
-    - name: Deploy using startup script
-      run: |
-        chmod +x start_server.sh
-        echo "Starting PlexDownloader..."
+        echo "💾 Checking drives..."
+        [ -d "/Volumes/plexlib/movies" ] && echo "✅ Movies: $(find /Volumes/plexlib/movies -name '*.mp4' -o -name '*.mkv' | wc -l | tr -d ' ') files" || echo "❌ Movies drive missing"
+        [ -d "/Volumes/plexlib/series" ] && echo "✅ Series: $(find /Volumes/plexlib/series -maxdepth 2 -type d | wc -l | tr -d ' ') shows" || echo "❌ Series drive missing"
+        
+        echo "🚀 Starting PlexDownloader in background..."
         nohup ./start_server.sh > deployment.log 2>&1 &
-        sleep 10
+        echo $! > server.pid
+        
+        echo "⏳ Waiting for server to start..."
+        sleep 15
         
     - name: Verify deployment
       run: |
-        echo "Checking if server is responding..."
-        curl -s http://localhost:8035/ > /dev/null && echo "✅ Server is running at http://192.168.178.38:8035" || echo "❌ Server not responding"
-        echo "Check logs with: tail -f /Users/jelteadmin/PlexDownloader/deployment.log"
+        echo "🧪 Testing server response..."
+        
+        # Test with timeout
+        if timeout 10 curl -s http://localhost:8035/ > /dev/null; then
+          echo "✅ PlexDownloader is running successfully!"
+          echo "🌐 Local access: http://localhost:8035"
+          echo "🌐 Network access: http://192.168.178.38:8035"
+          echo "📊 Server PID: $(cat server.pid 2>/dev/null || echo 'not found')"
+        else
+          echo "❌ Server not responding, checking logs..."
+          echo "--- Recent deployment logs ---"
+          tail -20 deployment.log 2>/dev/null || echo "No deployment log found"
+          exit 1
+        fi
+        
+    - name: Deployment summary
+      run: |
+        echo "🎬 PlexDownloader Deployment Complete!"
+        echo "========================================"
+        echo "📍 Server: http://192.168.178.38:8035"
+        echo "📋 Logs: tail -f /Users/jelteadmin/PlexDownloader/deployment.log"
+        echo "🛑 Stop: kill \$(cat /Users/jelteadmin/PlexDownloader/server.pid)"
+        echo "🔄 Restart: cd /Users/jelteadmin/PlexDownloader && ./start_server.sh"
