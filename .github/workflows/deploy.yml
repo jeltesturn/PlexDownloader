@@ -26,17 +26,16 @@ jobs:
         echo "Checking encrypted drive mounts..."
         if [ -d "/Volumes/plexlib/movies" ]; then
           echo "✅ Movies drive available"
-          ls -la "/Volumes/plexlib/movies" | head -5
         else
           echo "⚠️ Movies drive not mounted"
         fi
         
         if [ -d "/Volumes/plexlib/series" ]; then
-          echo "✅ TV Shows drive available" 
-          ls -la "/Volumes/plexlib/series" | head -5
+          echo "✅ TV Shows drive available"
         else
           echo "⚠️ TV Shows drive not mounted"
         fi
+        echo "Drive check complete."
         
     - name: Stop existing server (if running)
       run: |
