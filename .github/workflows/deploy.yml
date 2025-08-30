@@ -22,12 +22,7 @@ jobs:
     - name: Test server manually first
       run: |
         echo "Testing basic functionality..."
-        /usr/bin/python3 -c "
-import os
-print('Python working')
-print('Movies path exists:', os.path.exists('/Volumes/plexlib/movies'))
-print('Series path exists:', os.path.exists('/Volumes/plexlib/series'))
-"
+        /usr/bin/python3 -c "import os; print('Python working'); print('Movies path exists:', os.path.exists('/Volumes/plexlib/movies')); print('Series path exists:', os.path.exists('/Volumes/plexlib/series'))"
         
     - name: Deploy using startup script
       run: |
