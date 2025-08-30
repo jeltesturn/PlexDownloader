@@ -6,5 +6,6 @@
   "allowed_extensions": [".mp4", ".mkv", ".avi", ".mov", ".m4v", ".wmv", ".flv", ".webm"],
   "max_concurrent_downloads": 3,
   "chunk_size": 8192,
-  "project_path": "/Users/jelteadmin/PlexDownloader"
+  "project_path": "/Users/jelteadmin/PlexDownloader",
+  "deployment_ready": true
 }
