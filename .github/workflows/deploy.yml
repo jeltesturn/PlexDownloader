@@ -13,18 +13,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Create virtual environment
+    - name: Set up virtual environment and install dependencies
       run: |
-        python3 -m venv venv
-        source venv/bin/activate
-        
-    - name: Install dependencies
-      run: |
+        # Use system Python3 (already installed on Mac mini)
+        /usr/bin/python3 -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install -r requirements.txt
