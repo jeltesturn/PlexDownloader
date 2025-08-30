@@ -16,54 +16,62 @@ A web-based file download server for your Plex media collection. Allows you to b
 
 ## Configuration
 
-Edit `config.json` to customize:
+The `config.json` is pre-configured for Mac mini deployment:
 
 ```json
 {
-  "movies_path": "/path/to/your/movies",
-  "tv_shows_path": "/path/to/your/tv_shows", 
+  "movies_path": "/Volumes/plexlib/movies",
+  "tv_shows_path": "/Volumes/plexlib/series",
   "port": 8035,
   "bandwidth_limit_mbps": 10,
   "allowed_extensions": [".mp4", ".mkv", ".avi", ".mov", ".m4v", ".wmv", ".flv", ".webm"],
   "max_concurrent_downloads": 3,
-  "chunk_size": 8192
+  "chunk_size": 8192,
+  "project_path": "/Users/jelteadmin/PlexDownloader"
 }
 ```
 
-## Installation & Setup
+### Path Structure
+- **Movies**: Direct files like `MovieName.mp4`
+- **TV Shows**: Nested structure like `TvShowName/Season01/Episode1.mp4`
 
+## Mac Mini Setup
+
+### Prerequisites
+- Ensure encrypted drive is mounted at `/Volumes/plexlib/`
+- Movies should be at `/Volumes/plexlib/movies`
+- TV Shows should be at `/Volumes/plexlib/series`
+
+### Quick Start
+1. **On Mac mini** (at `/Users/jelteadmin/PlexDownloader`):
+   ```bash
+   ./start_server.sh
+   ```
+
+### Manual Setup
 1. **Clone the repository**:
    ```bash
+   cd /Users/jelteadmin
    git clone https://github.com/jeltesturn/PlexDownloader.git
    cd PlexDownloader
    ```
 
-2. **Create virtual environment**:
+2. **Run the startup script**:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   chmod +x start_server.sh
+   ./start_server.sh
    ```
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+3. **Access the interface**:
+   - Local: `http://localhost:8035`
+   - Network: `http://mac-mini-ip:8035`
 
-4. **Configure paths**:
-   Edit `config.json` with your actual movie and TV show paths
-
-5. **Run the server**:
-   ```bash
-   python app.py
-   ```
-
-   Or for production with gunicorn:
-   ```bash
-   gunicorn -w 4 -b 0.0.0.0:8035 app:app
-   ```
-
-6. **Access the interface**:
-   Open your browser to `http://your-mac-mini-ip:8035`
+### GitHub Actions Deployment
+The repository includes a GitHub Actions workflow that automatically:
+- Deploys to the Mac mini when you push changes
+- Checks encrypted drive availability
+- Restarts the server with new code
+- Provides deployment status
 
 ## Usage
 
@@ -84,11 +92,19 @@ For internet access, you'll need to configure port forwarding on your router to 
 
 This project is designed to be deployed via GitHub Actions to your Mac mini. Set up a self-hosted runner on your Mac mini to automatically deploy updates.
 
+## Encrypted Drive Notes
+
+- The app automatically detects if `/Volumes/plexlib/` is mounted
+- Warns if encrypted drives are not available
+- Gracefully handles drive unmounting during operation
+- Logs all drive access issues
+
 ## Security Notes
 
 - This server does not include authentication - anyone with network access can download files
 - Consider running behind a VPN or adding authentication for internet exposure
 - The server logs all download activities to `plexdownloader.log`
+- Encrypted drive access is logged for troubleshooting
 
 ## Logs
 

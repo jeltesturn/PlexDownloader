@@ -158,6 +158,25 @@
         .file-item.hidden {
             display: none;
         }
+        .actual-filename {
+            color: #888;
+            font-size: 0.9em;
+            font-weight: normal;
+            display: block;
+            margin-top: 3px;
+        }
+        .file-name {
+            line-height: 1.3;
+        }
+        .drive-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -205,7 +224,12 @@
                  data-path="{{ file.relative_path|lower }}">
                 <input type="checkbox" class="file-checkbox" data-path="{{ file.path }}" data-name="{{ file.name }}">
                 <div class="file-info">
-                    <div class="file-name">{{ file.name }}</div>
+                    <div class="file-name">
+                        {% if file.type == 'TV Show' and file.show_info %}
+                            {{ file.show_info }}
+                        {% endif %}
+                        <span class="actual-filename">{{ file.name }}</span>
+                    </div>
                     <div class="file-path">{{ file.relative_path }}</div>
                     <div class="file-size">
                         {% if file.size_gb >= 1 %}

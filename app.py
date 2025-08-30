@@ -58,42 +58,93 @@ download_state = {
     'lock': Lock()
 }
 
+def check_drive_availability(path):
+    """Check if the encrypted drive is available"""
+    try:
+        return os.path.exists(path) and os.access(path, os.R_OK)
+    except (OSError, IOError):
+        return False
+
+def get_show_info(relative_path):
+    """Extract show name and season info from TV show path"""
+    parts = relative_path.split(os.sep)
+    if len(parts) >= 2:
+        show_name = parts[0]
+        season_folder = parts[1] if len(parts) > 1 else ""
+        return show_name, season_folder
+    return relative_path, ""
+
 def get_all_files(base_paths):
     """Recursively get all files from the given paths"""
     files = []
+    
     for base_path in base_paths:
-        if not os.path.exists(base_path):
-            logging.warning(f"Path does not exist: {base_path}")
+        # Check if encrypted drive is mounted and accessible
+        if not check_drive_availability(base_path):
+            logging.warning(f"Drive not available or path does not exist: {base_path}")
+            if "/Volumes/" in base_path:
+                logging.warning(f"Encrypted drive may not be mounted: {base_path}")
             continue
         
         logging.info(f"Scanning directory: {base_path}")
-        for root, dirs, filenames in os.walk(base_path):
-            for filename in filenames:
-                # Filter by allowed extensions
-                file_ext = os.path.splitext(filename)[1].lower()
-                if file_ext not in ALLOWED_EXTENSIONS:
-                    continue
-                    
-                full_path = os.path.join(root, filename)
-                try:
-                    relative_path = os.path.relpath(full_path, base_path)
-                    file_size = os.path.getsize(full_path)
-                    
-                    files.append({
-                        'name': filename,
-                        'path': full_path,
-                        'relative_path': relative_path,
-                        'size': file_size,
-                        'size_mb': round(file_size / (1024 * 1024), 2),
-                        'size_gb': round(file_size / (1024 * 1024 * 1024), 2),
-                        'type': 'Movie' if base_path == MOVIES_PATH else 'TV Show',
-                        'extension': file_ext
-                    })
-                except (OSError, IOError) as e:
-                    logging.error(f"Error accessing file {full_path}: {e}")
-                    continue
+        file_count = 0
+        
+        try:
+            for root, dirs, filenames in os.walk(base_path):
+                # Skip hidden directories and system files
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                
+                for filename in filenames:
+                    # Skip hidden files and system files
+                    if filename.startswith('.') or filename == 'Thumbs.db':
+                        continue
+                        
+                    # Filter by allowed extensions
+                    file_ext = os.path.splitext(filename)[1].lower()
+                    if file_ext not in ALLOWED_EXTENSIONS:
+                        continue
+                        
+                    full_path = os.path.join(root, filename)
+                    try:
+                        relative_path = os.path.relpath(full_path, base_path)
+                        file_size = os.path.getsize(full_path)
+                        
+                        # Enhanced display for TV shows vs Movies
+                        is_tv_show = (base_path == TV_SHOWS_PATH)
+                        display_name = filename
+                        show_info = ""
+                        
+                        if is_tv_show:
+                            show_name, season_folder = get_show_info(relative_path)
+                            if show_name and season_folder:
+                                show_info = f"{show_name} - {season_folder}"
+                                display_name = f"{show_name} - {season_folder} - {filename}"
+                        
+                        files.append({
+                            'name': filename,
+                            'display_name': display_name,
+                            'path': full_path,
+                            'relative_path': relative_path,
+                            'size': file_size,
+                            'size_mb': round(file_size / (1024 * 1024), 2),
+                            'size_gb': round(file_size / (1024 * 1024 * 1024), 2),
+                            'type': 'TV Show' if is_tv_show else 'Movie',
+                            'extension': file_ext,
+                            'show_info': show_info
+                        })
+                        file_count += 1
+                        
+                    except (OSError, IOError, PermissionError) as e:
+                        logging.error(f"Error accessing file {full_path}: {e}")
+                        continue
+                        
+        except (OSError, IOError, PermissionError) as e:
+            logging.error(f"Error scanning directory {base_path}: {e}")
+            continue
+            
+        logging.info(f"Found {file_count} video files in {base_path}")
     
-    logging.info(f"Found {len(files)} video files")
+    logging.info(f"Total: {len(files)} video files found")
     return sorted(files, key=lambda x: (x['type'], x['relative_path']))
 
 @app.route('/')
@@ -123,10 +174,20 @@ def api_files():
 @app.route('/download/<path:file_path>')
 def download_file(file_path):
     """Download a file with bandwidth limiting"""
-    full_path = os.path.join('/', file_path)
+    # Handle URL-encoded paths properly
+    full_path = file_path
+    if not full_path.startswith('/'):
+        full_path = '/' + full_path
     
+    # Check if file exists and is accessible
     if not os.path.exists(full_path):
+        logging.error(f"File not found: {full_path}")
         return "File not found", 404
+        
+    # Check if drive is still mounted (for encrypted drives)
+    if "/Volumes/" in full_path and not check_drive_availability(os.path.dirname(full_path)):
+        logging.error(f"Drive not available for file: {full_path}")
+        return "Drive not available - please check if encrypted drive is mounted", 503
     
     def generate():
         download_id = f"{int(time.time())}_{os.path.basename(full_path)}"
@@ -189,6 +250,15 @@ if __name__ == '__main__':
     print("===================")
     print(f"Server will run on port {PORT}")
     print()
+    
+    # Check if encrypted drives are mounted
+    if MOVIES_PATH and not check_drive_availability(MOVIES_PATH):
+        logging.error(f"Movies drive not available: {MOVIES_PATH}")
+        print(f"⚠️  WARNING: Movies drive not mounted or accessible: {MOVIES_PATH}")
+        
+    if TV_SHOWS_PATH and not check_drive_availability(TV_SHOWS_PATH):
+        logging.error(f"TV Shows drive not available: {TV_SHOWS_PATH}")
+        print(f"⚠️  WARNING: TV Shows drive not mounted or accessible: {TV_SHOWS_PATH}")
     
     # Get paths from user if not in config
     if not MOVIES_PATH:

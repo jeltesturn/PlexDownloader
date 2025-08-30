@@ -1,0 +1,73 @@
+name: Deploy to Mac Mini
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Create virtual environment
+      run: |
+        python3 -m venv venv
+        source venv/bin/activate
+        
+    - name: Install dependencies
+      run: |
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Check encrypted drives
+      run: |
+        echo "Checking encrypted drive mounts..."
+        if [ -d "/Volumes/plexlib/movies" ]; then
+          echo "✅ Movies drive available"
+          ls -la "/Volumes/plexlib/movies" | head -5
+        else
+          echo "⚠️ Movies drive not mounted"
+        fi
+        
+        if [ -d "/Volumes/plexlib/series" ]; then
+          echo "✅ TV Shows drive available" 
+          ls -la "/Volumes/plexlib/series" | head -5
+        else
+          echo "⚠️ TV Shows drive not mounted"
+        fi
+        
+    - name: Stop existing server (if running)
+      run: |
+        # Kill any existing PlexDownloader processes
+        pkill -f "app.py" || true
+        pkill -f "gunicorn.*app:app" || true
+        sleep 2
+        
+    - name: Start PlexDownloader
+      run: |
+        source venv/bin/activate
+        nohup gunicorn -w 4 -b 0.0.0.0:8035 app:app --timeout 300 > server.log 2>&1 &
+        echo $! > server.pid
+        sleep 3
+        
+    - name: Verify server is running
+      run: |
+        sleep 5
+        curl -f http://localhost:8035/ > /dev/null && echo "✅ Server is running" || echo "❌ Server failed to start"
+        
+    - name: Display deployment info
+      run: |
+        echo "🎬 PlexDownloader deployed successfully!"
+        echo "📱 Access at: http://$(hostname):8035"
+        echo "📝 Logs: tail -f ~/PlexDownloader/server.log"
+        echo "🛑 Stop: kill \$(cat ~/PlexDownloader/server.pid)"

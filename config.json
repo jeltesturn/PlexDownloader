@@ -1,9 +1,10 @@
 {
-  "movies_path": "/path/to/movies",
-  "tv_shows_path": "/path/to/tv_shows",
+  "movies_path": "/Volumes/plexlib/movies",
+  "tv_shows_path": "/Volumes/plexlib/series",
   "port": 8035,
   "bandwidth_limit_mbps": 10,
   "allowed_extensions": [".mp4", ".mkv", ".avi", ".mov", ".m4v", ".wmv", ".flv", ".webm"],
   "max_concurrent_downloads": 3,
-  "chunk_size": 8192
+  "chunk_size": 8192,
+  "project_path": "/Users/jelteadmin/PlexDownloader"
 }
