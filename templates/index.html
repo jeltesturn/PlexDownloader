@@ -109,20 +109,111 @@
             width: 0%;
             transition: width 0.3s ease;
         }
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .search-container {
+            margin-bottom: 10px;
+        }
+        #search-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .filter-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-container label {
+            font-weight: bold;
+        }
+        .filter-container select {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .select-all-btn, .clear-all-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .select-all-btn:hover, .clear-all-btn:hover {
+            background: #5a6268;
+        }
+        .file-stats {
+            margin-bottom: 10px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .file-item.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Plex Downloader</h1>
         
-        <div class="file-list">
+        <!-- Search and Filter Controls -->
+        <div class="controls">
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search files..." onkeyup="filterFiles()">
+            </div>
+            <div class="filter-container">
+                <label for="type-filter">Type:</label>
+                <select id="type-filter" onchange="filterFiles()">
+                    <option value="all">All</option>
+                    <option value="Movie">Movies</option>
+                    <option value="TV Show">TV Shows</option>
+                </select>
+                
+                <label for="size-filter">Size:</label>
+                <select id="size-filter" onchange="filterFiles()">
+                    <option value="all">All Sizes</option>
+                    <option value="small">< 1 GB</option>
+                    <option value="medium">1-5 GB</option>
+                    <option value="large">> 5 GB</option>
+                </select>
+                
+                <button class="select-all-btn" onclick="selectAllVisible()">Select All Visible</button>
+                <button class="clear-all-btn" onclick="clearAllSelections()">Clear All</button>
+            </div>
+        </div>
+        
+        <div class="file-stats">
+            <span id="total-files">0</span> files found | 
+            <span id="visible-files">0</span> visible | 
+            <span id="total-size">0</span> GB total
+        </div>
+        
+        <div class="file-list" id="file-list">
             {% for file in files %}
-            <div class="file-item">
+            <div class="file-item" 
+                 data-name="{{ file.name|lower }}" 
+                 data-type="{{ file.type }}" 
+                 data-size="{{ file.size_gb }}" 
+                 data-path="{{ file.relative_path|lower }}">
                 <input type="checkbox" class="file-checkbox" data-path="{{ file.path }}" data-name="{{ file.name }}">
                 <div class="file-info">
                     <div class="file-name">{{ file.name }}</div>
                     <div class="file-path">{{ file.relative_path }}</div>
-                    <div class="file-size">{{ file.size_mb }} MB</div>
+                    <div class="file-size">
+                        {% if file.size_gb >= 1 %}
+                            {{ file.size_gb }} GB
+                        {% else %}
+                            {{ file.size_mb }} MB
+                        {% endif %}
+                    </div>
                 </div>
                 <span class="file-type {% if file.type == 'TV Show' %}tv-show{% endif %}">
                     {{ file.type }}
@@ -144,6 +235,11 @@
 
     <script>
         let selectedFiles = [];
+        
+        // Initialize file data
+        document.addEventListener('DOMContentLoaded', function() {
+            updateFileStats();
+        });
         
         // Handle checkbox selection
         document.querySelectorAll('.file-checkbox').forEach(checkbox => {
@@ -211,6 +307,77 @@
             setTimeout(() => {
                 downloadFiles(files, index + 1, progressFill);
             }, 1000);
+        }
+        
+        function filterFiles() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const typeFilter = document.getElementById('type-filter').value;
+            const sizeFilter = document.getElementById('size-filter').value;
+            
+            const fileItems = document.querySelectorAll('.file-item');
+            let visibleCount = 0;
+            
+            fileItems.forEach(item => {
+                const fileName = item.dataset.name;
+                const filePath = item.dataset.path;
+                const fileType = item.dataset.type;
+                const fileSize = parseFloat(item.dataset.size);
+                
+                let showFile = true;
+                
+                // Search filter
+                if (searchTerm && !fileName.includes(searchTerm) && !filePath.includes(searchTerm)) {
+                    showFile = false;
+                }
+                
+                // Type filter
+                if (typeFilter !== 'all' && fileType !== typeFilter) {
+                    showFile = false;
+                }
+                
+                // Size filter
+                if (sizeFilter !== 'all') {
+                    if (sizeFilter === 'small' && fileSize >= 1) showFile = false;
+                    if (sizeFilter === 'medium' && (fileSize < 1 || fileSize > 5)) showFile = false;
+                    if (sizeFilter === 'large' && fileSize <= 5) showFile = false;
+                }
+                
+                if (showFile) {
+                    item.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    item.classList.add('hidden');
+                }
+            });
+            
+            document.getElementById('visible-files').textContent = visibleCount;
+        }
+        
+        function selectAllVisible() {
+            document.querySelectorAll('.file-item:not(.hidden) .file-checkbox').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            updateSelectedFiles();
+        }
+        
+        function clearAllSelections() {
+            document.querySelectorAll('.file-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            updateSelectedFiles();
+        }
+        
+        function updateFileStats() {
+            const fileItems = document.querySelectorAll('.file-item');
+            let totalSize = 0;
+            
+            fileItems.forEach(item => {
+                totalSize += parseFloat(item.dataset.size) || 0;
+            });
+            
+            document.getElementById('total-files').textContent = fileItems.length;
+            document.getElementById('visible-files').textContent = fileItems.length;
+            document.getElementById('total-size').textContent = totalSize.toFixed(1);
         }
     </script>
 </body>
