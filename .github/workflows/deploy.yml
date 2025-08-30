@@ -13,52 +13,31 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up virtual environment and install dependencies
-      run: |
-        # Use system Python3 (already installed on Mac mini)
-        /usr/bin/python3 -m venv venv
-        source venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Check encrypted drives
-      run: |
-        echo "Checking encrypted drive mounts..."
-        if [ -d "/Volumes/plexlib/movies" ]; then
-          echo "✅ Movies drive available"
-        else
-          echo "⚠️ Movies drive not mounted"
-        fi
-        
-        if [ -d "/Volumes/plexlib/series" ]; then
-          echo "✅ TV Shows drive available"
-        else
-          echo "⚠️ TV Shows drive not mounted"
-        fi
-        echo "Drive check complete."
-        
     - name: Stop existing server (if running)
       run: |
-        # Kill any existing PlexDownloader processes
         pkill -f "app.py" || true
         pkill -f "gunicorn.*app:app" || true
         sleep 2
         
-    - name: Start PlexDownloader
+    - name: Test server manually first
       run: |
-        source venv/bin/activate
-        nohup gunicorn -w 4 -b 0.0.0.0:8035 app:app --timeout 300 > server.log 2>&1 &
-        echo $! > server.pid
-        sleep 3
+        echo "Testing basic functionality..."
+        /usr/bin/python3 -c "
+import os
+print('Python working')
+print('Movies path exists:', os.path.exists('/Volumes/plexlib/movies'))
+print('Series path exists:', os.path.exists('/Volumes/plexlib/series'))
+"
         
-    - name: Verify server is running
+    - name: Deploy using startup script
       run: |
-        sleep 5
-        curl -f http://localhost:8035/ > /dev/null && echo "✅ Server is running" || echo "❌ Server failed to start"
+        chmod +x start_server.sh
+        echo "Starting PlexDownloader..."
+        nohup ./start_server.sh > deployment.log 2>&1 &
+        sleep 10
         
-    - name: Display deployment info
+    - name: Verify deployment
       run: |
-        echo "🎬 PlexDownloader deployed successfully!"
-        echo "📱 Access at: http://$(hostname):8035"
-        echo "📝 Logs: tail -f ~/PlexDownloader/server.log"
-        echo "🛑 Stop: kill \$(cat ~/PlexDownloader/server.pid)"
+        echo "Checking if server is responding..."
+        curl -s http://localhost:8035/ > /dev/null && echo "✅ Server is running at http://192.168.178.38:8035" || echo "❌ Server not responding"
+        echo "Check logs with: tail -f /Users/jelteadmin/PlexDownloader/deployment.log"
