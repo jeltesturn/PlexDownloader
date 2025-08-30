@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plex Downloader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .file-list {
+            margin-top: 20px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            hover: background-color: #f9f9f9;
+        }
+        .file-item:hover {
+            background-color: #f9f9f9;
+        }
+        .file-checkbox {
+            margin-right: 10px;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .file-path {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .file-size {
+            color: #888;
+            font-size: 0.8em;
+        }
+        .file-type {
+            background: #007bff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .tv-show {
+            background: #28a745;
+        }
+        .download-section {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 2px solid #007bff;
+            padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .download-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .download-btn:hover {
+            background: #0056b3;
+        }
+        .download-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .selected-count {
+            margin-right: 20px;
+            font-weight: bold;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #007bff;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Plex Downloader</h1>
+        
+        <div class="file-list">
+            {% for file in files %}
+            <div class="file-item">
+                <input type="checkbox" class="file-checkbox" data-path="{{ file.path }}" data-name="{{ file.name }}">
+                <div class="file-info">
+                    <div class="file-name">{{ file.name }}</div>
+                    <div class="file-path">{{ file.relative_path }}</div>
+                    <div class="file-size">{{ file.size_mb }} MB</div>
+                </div>
+                <span class="file-type {% if file.type == 'TV Show' %}tv-show{% endif %}">
+                    {{ file.type }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="download-section">
+        <span class="selected-count">Selected: <span id="selected-count">0</span> files</span>
+        <button class="download-btn" id="download-btn" onclick="startDownload()" disabled>
+            Download Selected Files
+        </button>
+        <div class="progress-bar" id="progress-bar" style="display: none;">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+        
+        // Handle checkbox selection
+        document.querySelectorAll('.file-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateSelectedFiles();
+            });
+        });
+        
+        function updateSelectedFiles() {
+            selectedFiles = [];
+            document.querySelectorAll('.file-checkbox:checked').forEach(checkbox => {
+                selectedFiles.push({
+                    path: checkbox.dataset.path,
+                    name: checkbox.dataset.name
+                });
+            });
+            
+            document.getElementById('selected-count').textContent = selectedFiles.length;
+            document.getElementById('download-btn').disabled = selectedFiles.length === 0;
+        }
+        
+        function startDownload() {
+            if (selectedFiles.length === 0) return;
+            
+            const progressBar = document.getElementById('progress-bar');
+            const progressFill = document.getElementById('progress-fill');
+            const downloadBtn = document.getElementById('download-btn');
+            
+            progressBar.style.display = 'block';
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Downloading...';
+            
+            // Download each file sequentially
+            downloadFiles(selectedFiles, 0, progressFill);
+        }
+        
+        function downloadFiles(files, index, progressFill) {
+            if (index >= files.length) {
+                // All downloads complete
+                document.getElementById('download-btn').disabled = false;
+                document.getElementById('download-btn').textContent = 'Download Selected Files';
+                document.getElementById('progress-bar').style.display = 'none';
+                progressFill.style.width = '0%';
+                
+                // Uncheck all checkboxes
+                document.querySelectorAll('.file-checkbox:checked').forEach(cb => cb.checked = false);
+                updateSelectedFiles();
+                return;
+            }
+            
+            const file = files[index];
+            const progress = ((index + 1) / files.length) * 100;
+            progressFill.style.width = progress + '%';
+            
+            // Create download link and trigger download
+            const link = document.createElement('a');
+            link.href = '/download/' + encodeURIComponent(file.path.substring(1)); // Remove leading slash
+            link.download = file.name;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Move to next file after a short delay
+            setTimeout(() => {
+                downloadFiles(files, index + 1, progressFill);
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
